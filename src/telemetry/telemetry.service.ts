@@ -79,13 +79,17 @@ export class TelemetryService {
     throw new NotFoundException(`Device ${dto.deviceId} not found`);
   }
 
-  // Use device timestamp when provided, otherwise backend receive time
+  // Use device timestamp if provided, otherwise use backend receive time
   let recordTime = new Date();
 
   if (dto.timestamp) {
     recordTime = new Date(dto.timestamp);
 
-    // Deduplicate exact same wearable event
+    if (isNaN(recordTime.getTime())) {
+      throw new Error(`Invalid wearable timestamp: ${dto.timestamp}`);
+    }
+
+    // Ignore exact duplicate event from the same device
     const existingEvent = await this.prisma.activity_events.findFirst({
       where: {
         device_id: device.id,
@@ -102,12 +106,14 @@ export class TelemetryService {
       return {
         success: true,
         duplicate: true,
+        receivedTimestamp: dto.timestamp,
+        matchedTimestamp: recordTime.toISOString(),
       };
     }
   }
 
   // Save event using device timestamp
-  await this.prisma.activity_events.create({
+  const event = await this.prisma.activity_events.create({
     data: {
       device_id: device.id,
       type: dto.eventType as any,
@@ -135,6 +141,9 @@ export class TelemetryService {
   return {
     success: true,
     duplicate: false,
+    eventId: event.id,
+    receivedTimestamp: dto.timestamp ?? null,
+    storedTimestamp: recordTime.toISOString(),
   };
 }
 
