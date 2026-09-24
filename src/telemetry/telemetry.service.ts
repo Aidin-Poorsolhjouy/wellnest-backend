@@ -66,45 +66,77 @@ export class TelemetryService {
   }
 
   async processWearableTelemetry(dto: CreateWearableTelemetryDto) {
-    this.logger.log(
-      `Received wearable event [${dto.eventType}] for device: ${dto.deviceId}`,
-    );
+  this.logger.log(
+    `Received wearable event [${dto.eventType}] for device: ${dto.deviceId}`,
+  );
 
-    const device = await this.prisma.devices.findUnique({
-      where: { id: dto.deviceId },
-      select: { id: true, senior_id: true },
-    });
+  const device = await this.prisma.devices.findUnique({
+    where: { id: dto.deviceId },
+    select: { id: true, senior_id: true },
+  });
 
-    if (!device)
-      throw new NotFoundException(`Device ${dto.deviceId} not found`);
+  if (!device) {
+    throw new NotFoundException(`Device ${dto.deviceId} not found`);
+  }
 
-    // 1. Save the event to the database
-    await this.prisma.activity_events.create({
-      data: {
+  // Use device timestamp when provided, otherwise backend receive time
+  let recordTime = new Date();
+
+  if (dto.timestamp) {
+    recordTime = new Date(dto.timestamp);
+
+    // Deduplicate exact same wearable event
+    const existingEvent = await this.prisma.activity_events.findFirst({
+      where: {
         device_id: device.id,
         type: dto.eventType as any,
+        recorded_at: recordTime,
       },
     });
 
-    // 2. Trigger Alerts for Emergencies
-    if (device.senior_id) {
-      if (dto.eventType === 'FALL') {
-        await this.triggerAlert(
-          device.senior_id,
-          '🚨 CRITICAL: Fall Detected',
-          'Sudden impact and orientation change detected. Immediate check required.',
-        );
-      } else if (dto.eventType === 'PANIC') {
-        await this.triggerAlert(
-          device.senior_id,
-          '🆘 EMERGENCY: Panic Button',
-          'Senior pressed the emergency panic button on their wearable.',
-        );
-      }
-    }
+    if (existingEvent) {
+      this.logger.debug(
+        `[DEDUPE] Ignored duplicate wearable event [${dto.eventType}] from ${dto.timestamp}`,
+      );
 
-    return { success: true };
+      return {
+        success: true,
+        duplicate: true,
+      };
+    }
   }
+
+  // Save event using device timestamp
+  await this.prisma.activity_events.create({
+    data: {
+      device_id: device.id,
+      type: dto.eventType as any,
+      recorded_at: recordTime,
+    },
+  });
+
+  // Trigger alerts for emergency events
+  if (device.senior_id) {
+    if (dto.eventType === 'FALL') {
+      await this.triggerAlert(
+        device.senior_id,
+        '🚨 CRITICAL: Fall Detected',
+        'Sudden impact and orientation change detected. Immediate check required.',
+      );
+    } else if (dto.eventType === 'PANIC') {
+      await this.triggerAlert(
+        device.senior_id,
+        '🆘 EMERGENCY: Panic Button',
+        'Senior pressed the emergency panic button on their wearable.',
+      );
+    }
+  }
+
+  return {
+    success: true,
+    duplicate: false,
+  };
+}
 
   /**
    * THE THRESHOLD ENGINE

@@ -52,4 +52,13 @@ export class CreateWearableTelemetryDto {
   })
   @IsEnum(EventType)
   eventType: EventType;
+
+  @ApiProperty({
+  example: '2026-09-25T00:15:30Z',
+  description: 'Device generated timestamp',
+  required: false,
+  })
+  @IsString()
+  @IsOptional()
+  timestamp?: string;
 }
