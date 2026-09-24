@@ -43,4 +43,14 @@ export class AppController {
       });
     });
   }
+
+  @Get('mqtt-env-check')
+  checkMqttEnv() {
+    return {
+      url: process.env.HIVEMQ_URL,
+      username: process.env.HIVEMQ_USERNAME,
+      passwordSet: !!process.env.HIVEMQ_PASSWORD,
+      passwordLength: process.env.HIVEMQ_PASSWORD?.length ?? 0,
+    };
+  }
 }
