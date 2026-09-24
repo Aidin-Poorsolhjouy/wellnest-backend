@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model activity_events {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  device_id   String?    @db.Uuid
+  type        event_type
+  metadata    Json?
+  recorded_at DateTime?  @default(now()) @db.Timestamptz(6)
+  devices     devices?   @relation(fields: [device_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model alerts {
+  id                              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  senior_id                       String?       @db.Uuid
+  title                           String        @db.VarChar(255)
+  message                         String
+  status                          alert_status? @default(ACTIVE)
+  created_at                      DateTime?     @default(now()) @db.Timestamptz(6)
+  resolved_at                     DateTime?     @db.Timestamptz(6)
+  resolved_by                     String?       @db.Uuid
+  users_alerts_resolved_byTousers users?        @relation("alerts_resolved_byTousers", fields: [resolved_by], references: [id], onUpdate: NoAction)
+  users_alerts_senior_idTousers   users?        @relation("alerts_senior_idTousers", fields: [senior_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model caregiver_journal {
+  id                                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  senior_id                                String?   @db.Uuid
+  author_id                                String?   @db.Uuid
+  note                                     String
+  created_at                               DateTime? @default(now()) @db.Timestamptz(6)
+  users_caregiver_journal_author_idTousers users?    @relation("caregiver_journal_author_idTousers", fields: [author_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_caregiver_journal_senior_idTousers users?    @relation("caregiver_journal_senior_idTousers", fields: [senior_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model caregiver_senior {
+  caregiver_id                               String    @db.Uuid
+  senior_id                                  String    @db.Uuid
+  created_at                                 DateTime? @default(now()) @db.Timestamptz(6)
+  users_caregiver_senior_caregiver_idTousers users     @relation("caregiver_senior_caregiver_idTousers", fields: [caregiver_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_caregiver_senior_senior_idTousers    users     @relation("caregiver_senior_senior_idTousers", fields: [senior_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([caregiver_id, senior_id])
+}
+
+model daily_checkins {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  senior_id   String?   @db.Uuid
+  recorded_at DateTime? @default(now()) @db.Timestamptz(6)
+  users       users?    @relation(fields: [senior_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model devices {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  serial_number          String                   @unique @db.VarChar(100)
+  type                   device_type
+  senior_id              String?                  @db.Uuid
+  battery_level          Int?                     @default(100)
+  last_heartbeat         DateTime?                @default(now()) @db.Timestamptz(6)
+  created_at             DateTime?                @default(now()) @db.Timestamptz(6)
+  activity_events        activity_events[]
+  users                  users?                   @relation(fields: [senior_id], references: [id], onUpdate: NoAction)
+  environmental_readings environmental_readings[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model environmental_readings {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  device_id         String?   @db.Uuid
+  temperature       Decimal?  @db.Decimal(5, 2)
+  humidity          Decimal?  @db.Decimal(5, 2)
+  recorded_at       DateTime? @default(now()) @db.Timestamptz(6)
+  gas_resistance    Decimal?  @db.Decimal
+  occupancy         Boolean?  @default(false)
+  air_quality_score Decimal?  @db.Decimal
+  devices           devices?  @relation(fields: [device_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model medication_logs {
+  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schedule_id          String?               @db.Uuid
+  status               med_status
+  logged_at            DateTime?             @default(now()) @db.Timestamptz(6)
+  medication_schedules medication_schedules? @relation(fields: [schedule_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model medication_schedules {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  senior_id       String?           @db.Uuid
+  medicine_name   String            @db.VarChar(255)
+  dosage          String            @db.VarChar(100)
+  time_of_day     DateTime          @db.Time(6)
+  created_at      DateTime?         @default(now()) @db.Timestamptz(6)
+  medication_logs medication_logs[]
+  users           users?            @relation(fields: [senior_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model messages {
+  id                                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sender_id                         String?   @db.Uuid
+  receiver_id                       String?   @db.Uuid
+  content                           String
+  is_read                           Boolean?  @default(false)
+  created_at                        DateTime? @default(now()) @db.Timestamptz(6)
+  users_messages_receiver_idTousers users?    @relation("messages_receiver_idTousers", fields: [receiver_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_messages_sender_idTousers   users?    @relation("messages_sender_idTousers", fields: [sender_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model thresholds {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  metric     String    @db.VarChar(50)
+  min_value  Decimal?  @db.Decimal(10, 2)
+  max_value  Decimal?  @db.Decimal(10, 2)
+  senior_id  String?   @db.Uuid
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at DateTime? @default(now()) @db.Timestamptz(6)
+  users      users?    @relation(fields: [senior_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model users {
+  id                                                    String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                                                 String                 @unique @db.VarChar(255)
+  first_name                                            String                 @db.VarChar(100)
+  last_name                                             String                 @db.VarChar(100)
+  role                                                  user_role
+  created_at                                            DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at                                            DateTime?              @default(now()) @db.Timestamptz(6)
+  alerts_alerts_resolved_byTousers                      alerts[]               @relation("alerts_resolved_byTousers")
+  alerts_alerts_senior_idTousers                        alerts[]               @relation("alerts_senior_idTousers")
+  caregiver_journal_caregiver_journal_author_idTousers  caregiver_journal[]    @relation("caregiver_journal_author_idTousers")
+  caregiver_journal_caregiver_journal_senior_idTousers  caregiver_journal[]    @relation("caregiver_journal_senior_idTousers")
+  caregiver_senior_caregiver_senior_caregiver_idTousers caregiver_senior[]     @relation("caregiver_senior_caregiver_idTousers")
+  caregiver_senior_caregiver_senior_senior_idTousers    caregiver_senior[]     @relation("caregiver_senior_senior_idTousers")
+  daily_checkins                                        daily_checkins[]
+  devices                                               devices[]
+  medication_schedules                                  medication_schedules[]
+  messages_messages_receiver_idTousers                  messages[]             @relation("messages_receiver_idTousers")
+  messages_messages_sender_idTousers                    messages[]             @relation("messages_sender_idTousers")
+  thresholds                                            thresholds[]
+}
+
+enum alert_status {
+  ACTIVE
+  RESOLVED
+}
+
+enum device_type {
+  POD
+  WEARABLE
+}
+
+enum event_type {
+  FALL
+  PANIC
+  REGULAR_MOVEMENT
+  NO_MOVEMENT
+}
+
+enum med_status {
+  TAKEN
+  SKIPPED
+  MISSED
+}
+
+enum user_role {
+  ADMIN
+  CAREGIVER
+  SENIOR
+}
