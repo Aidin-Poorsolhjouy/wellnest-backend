@@ -1,25 +1,43 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { PrismaService } from './../src/prisma/prisma.service';
+import { TelemetryService } from './../src/telemetry/telemetry.service';
+import { UsersService } from './../src/users/users.service';
 
-describe('AppController (e2e)', () => {
+describe('WellNest API (e2e)', () => {
   let app: INestApplication<App>;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(PrismaService)
+      .useValue({})
+      .overrideProvider(TelemetryService)
+      .useValue({})
+      .overrideProvider(UsersService)
+      .useValue({})
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('/health (GET)', async () => {
+    await request(app.getHttpServer())
+      .get('/health')
       .expect(200)
-      .expect('Hello World!');
+      .expect({ status: 'ok', service: 'wellnest-backend' });
+  });
+
+  it('returns 404 for an unknown route', async () => {
+    await request(app.getHttpServer()).get('/does-not-exist').expect(404);
   });
 });
