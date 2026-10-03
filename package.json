@@ -19,7 +19,13 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "qa:simulator": "ts-node scripts/qa-simulator.ts",
-    "qa:mqtt": "ts-node scripts/qa-mqtt-e2e.ts"
+    "qa:mqtt": "ts-node scripts/qa-mqtt-e2e.ts",
+    "qa:deployed-api": "ts-node scripts/qa-deployed-api.ts",
+    "qa:performance": "ts-node scripts/qa-performance.ts",
+    "qa:browser-fixtures": "ts-node scripts/qa-browser-fixtures.ts",
+    "qa:reliability": "ts-node scripts/qa-reliability.ts",
+    "qa:performance-matrix": "ts-node scripts/qa-performance-matrix.ts",
+    "qa:security": "ts-node scripts/qa-security-audit.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

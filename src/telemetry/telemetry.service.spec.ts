@@ -6,6 +6,8 @@ describe('TelemetryService', () => {
   let service: TelemetryService;
 
   const prisma = {
+    $executeRaw: jest.fn(),
+    $transaction: jest.fn(),
     devices: {
       findUnique: jest.fn(),
     },
@@ -28,6 +30,8 @@ describe('TelemetryService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.$executeRaw.mockResolvedValue(1);
+    prisma.$transaction.mockImplementation(async (callback: any) => callback(prisma));
     service = new TelemetryService(prisma as any);
 
     prisma.environmental_readings.findFirst.mockResolvedValue(null);
@@ -90,6 +94,8 @@ describe('TelemetryService', () => {
 
       await service.processPodTelemetry({ ...basePod, timestamp });
 
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
       expect(prisma.environmental_readings.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           recorded_at: new Date(timestamp),
@@ -108,6 +114,19 @@ describe('TelemetryService', () => {
       const result = await service.processPodTelemetry({ ...basePod, timestamp });
 
       expect(result).toEqual({ success: true, duplicate: true });
+      expect(prisma.environmental_readings.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid Pod timestamp', async () => {
+      prisma.devices.findUnique.mockResolvedValue({
+        id: basePod.deviceId,
+        senior_id: null,
+      });
+
+      await expect(
+        service.processPodTelemetry({ ...basePod, timestamp: 'not-a-date' }),
+      ).rejects.toThrow('Invalid Pod timestamp');
+
       expect(prisma.environmental_readings.create).not.toHaveBeenCalled();
     });
 
