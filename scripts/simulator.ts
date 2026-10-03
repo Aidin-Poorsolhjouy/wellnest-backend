@@ -26,7 +26,6 @@ POD CONTROLS:
 
 WEARABLE CONTROLS:
 [ f ] - 🚨 Trigger FALL DETECTED
-[ p ] - 🆘 Trigger PANIC BUTTON
 [ w ] - Send Normal Walking Movement
 
 [ q ] - Quit Simulator
@@ -71,6 +70,5 @@ process.stdin.on('keypress', (str, key) => {
 
   // Wearable
   if (key.name === 'f') sendWearable('FALL');
-  if (key.name === 'p') sendWearable('PANIC');
   if (key.name === 'w') sendWearable('REGULAR_MOVEMENT');
 });

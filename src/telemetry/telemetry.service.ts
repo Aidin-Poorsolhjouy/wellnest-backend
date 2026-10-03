@@ -183,7 +183,13 @@ export class TelemetryService {
     // Evaluate Air Quality Score (0-100%)
     // Alert if score drops below the minimum (e.g., 50%)
     const airThreshold = getActiveThreshold('AIR_QUALITY_PERCENT');
-    if (airThreshold && airThreshold.min_value && dto.airQualityScore && dto.airQualityScore < Number(airThreshold.min_value)) {
+    if (
+      airThreshold &&
+      airThreshold.min_value &&
+      dto.airQualityScore !== undefined &&
+      dto.airQualityScore !== null &&
+      dto.airQualityScore < Number(airThreshold.min_value)
+    ) {
       await this.triggerAlert(seniorId, 'Poor Air Quality', `Air quality has dropped to ${dto.airQualityScore.toFixed(0)}%. Please ventilate the room.`);
     }
   }
