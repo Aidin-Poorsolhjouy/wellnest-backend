@@ -14,6 +14,7 @@ describe('UsersService', () => {
   const prisma = {
     users: {
       create: jest.fn(),
+      findUnique: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
     },
@@ -131,6 +132,19 @@ describe('UsersService', () => {
     });
   });
 
+  it('rejects createAnyUser when password is missing before calling Supabase', async () => {
+    await expect(
+      service.createAnyUser({
+        email: 'caregiver@example.com',
+        firstName: 'Care',
+        lastName: 'Giver',
+        role: 'CAREGIVER',
+      }),
+    ).rejects.toThrow('Password is required.');
+
+    expect(supabaseAdmin.auth.admin.createUser).not.toHaveBeenCalled();
+  });
+
   it('propagates Supabase auth creation errors as BadRequestException', async () => {
     supabaseAdmin.auth.admin.createUser.mockResolvedValue({
       data: { user: null },
@@ -146,5 +160,44 @@ describe('UsersService', () => {
         role: 'CAREGIVER',
       }),
     ).rejects.toThrow('User already registered');
+  });
+
+  it('deletes the Auth user if public-profile creation fails', async () => {
+    supabaseAdmin.auth.admin.createUser.mockResolvedValue({
+      data: { user: { id: 'new-user-id' } },
+      error: null,
+    });
+    prisma.users.create.mockRejectedValue(new Error('database failure'));
+    supabaseAdmin.auth.admin.deleteUser.mockResolvedValue({ error: null });
+
+    await expect(
+      service.createAnyUser({
+        email: 'caregiver@example.com',
+        password: 'SafePassword123!',
+        firstName: 'Care',
+        lastName: 'Giver',
+        role: 'CAREGIVER',
+      }),
+    ).rejects.toThrow('database failure');
+
+    expect(supabaseAdmin.auth.admin.deleteUser).toHaveBeenCalledWith(
+      'new-user-id',
+    );
+  });
+
+  it('rejects managed-senior creation for an invalid caregiver before creating Auth state', async () => {
+    prisma.users.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.createManagedSenior({
+        email: 'senior@example.com',
+        password: 'SafePassword123!',
+        firstName: 'Senior',
+        lastName: 'User',
+        caregiverId: 'missing-caregiver',
+      }),
+    ).rejects.toThrow('A valid caregiver is required.');
+
+    expect(supabaseAdmin.auth.admin.createUser).not.toHaveBeenCalled();
   });
 });
