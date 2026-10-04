@@ -215,9 +215,16 @@ export class UsersService {
     const { email, password, firstName, lastName } =
       this.validateUserFields(data);
 
-    const role = this.requireText(data?.role, 'Role');
-    if (!['ADMIN', 'CAREGIVER', 'SENIOR'].includes(role)) {
-      throw new BadRequestException('Role must be ADMIN, CAREGIVER, or SENIOR.');
+    const roleText = this.requireText(data?.role, 'Role');
+    let role: 'ADMIN' | 'CAREGIVER' | 'SENIOR';
+    switch (roleText) {
+      case 'ADMIN':
+      case 'CAREGIVER':
+      case 'SENIOR':
+        role = roleText;
+        break;
+      default:
+        throw new BadRequestException('Role must be ADMIN, CAREGIVER, or SENIOR.');
     }
 
     const { data: authUser, error: authError } =
