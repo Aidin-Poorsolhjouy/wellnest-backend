@@ -1,8 +1,20 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Logger } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TelemetryService } from './telemetry.service';
-import { CreatePodTelemetryDto, CreateWearableTelemetryDto } from './dto/create-telemetry.dto';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  CreatePodTelemetryDto,
+  CreateWearableTelemetryDto,
+} from './dto/create-telemetry.dto';
+import { TelemetryHttpGuard } from '../auth/telemetry-http.guard';
 
 @ApiTags('Telemetry (IoT Data Ingestion)')
 @Controller('telemetry')
@@ -11,46 +23,41 @@ export class TelemetryController {
 
   constructor(private readonly telemetryService: TelemetryService) {}
 
-  // ==========================================
-  // HTTP ENDPOINTS (For Software Simulator)
-  // ==========================================
   @Post('pod')
+  @UseGuards(TelemetryHttpGuard)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Ingest environmental data from a WellNest Pod' })
+  @ApiOperation({ summary: 'Ingest environmental data from a WellNest Pod simulator' })
   @ApiResponse({ status: 201, description: 'Telemetry saved and evaluated successfully.' })
-  async receivePodData(@Body() createPodTelemetryDto: CreatePodTelemetryDto) {
-    return await this.telemetryService.processPodTelemetry(createPodTelemetryDto);
+  async receivePodData(@Body() dto: CreatePodTelemetryDto) {
+    return this.telemetryService.processPodTelemetry(dto);
   }
 
   @Post('wearable')
+  @UseGuards(TelemetryHttpGuard)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Ingest motion events from a WellNest Wearable' })
+  @ApiOperation({ summary: 'Ingest motion events from a WellNest Wearable simulator' })
   async receiveWearableData(@Body() dto: CreateWearableTelemetryDto) {
-    return await this.telemetryService.processWearableTelemetry(dto);
+    return this.telemetryService.processWearableTelemetry(dto);
   }
 
-  // ==========================================
-  // MQTT ENDPOINTS (For Real Arduino Hardware)
-  // ==========================================
   @MessagePattern('wellnest/mvp/pod')
   async handlePodMqtt(@Payload() data: any) {
-    this.logger.log(`Received MQTT Pod Data`);
+    this.logger.log('Received MQTT Pod Data');
     try {
-      // MQTT payloads often arrive as strings, so we parse them safely
       const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
       await this.telemetryService.processPodTelemetry(parsedData);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to process MQTT Pod data: ${error.message}`);
     }
   }
 
   @MessagePattern('wellnest/mvp/wearable')
   async handleWearableMqtt(@Payload() data: any) {
-    this.logger.log(`Received MQTT Wearable Data`);
+    this.logger.log('Received MQTT Wearable Data');
     try {
       const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
       await this.telemetryService.processWearableTelemetry(parsedData);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to process MQTT Wearable data: ${error.message}`);
     }
   }

@@ -1,11 +1,9 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import 'dotenv/config';
+import { AppModule } from './app.module';
 
-// Catch unexpected Node-level failures
 process.on('uncaughtException', (err) => {
   console.error('[UNCAUGHT EXCEPTION]', err);
 });
@@ -16,32 +14,8 @@ process.on('unhandledRejection', (reason) => {
 
 async function bootstrap() {
   try {
-    console.log('[BOOT 1] Starting WellNest backend...');
-
-    console.log('[ENV] PORT:', process.env.PORT || 'not set - using 3000');
-    console.log('[ENV] DATABASE_URL exists:', !!process.env.DATABASE_URL);
-    console.log('[ENV] SUPABASE_URL exists:', !!process.env.SUPABASE_URL);
-    console.log(
-      '[ENV] SUPABASE_SERVICE_ROLE_KEY exists:',
-      !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    );
-    console.log('[ENV] HIVEMQ_URL exists:', !!process.env.HIVEMQ_URL);
-    console.log(
-      '[ENV] HIVEMQ_USERNAME exists:',
-      !!process.env.HIVEMQ_USERNAME,
-    );
-    console.log(
-      '[ENV] HIVEMQ_PASSWORD exists:',
-      !!process.env.HIVEMQ_PASSWORD,
-    );
-
-    console.log('[BOOT 2] Creating Nest application...');
-
     const app = await NestFactory.create(AppModule);
 
-    console.log('[BOOT 3] Nest application created');
-
-    // Global validation
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -50,27 +24,56 @@ async function bootstrap() {
       }),
     );
 
-    console.log('[BOOT 4] Validation configured');
+    const configuredOrigins = (
+      process.env.CORS_ORIGINS || 'https://app.wellnest.one'
+    )
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
 
-    // CORS
-    app.enableCors();
+    if (process.env.NODE_ENV !== 'production') {
+      configuredOrigins.push(
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+      );
+    }
 
-    console.log('[BOOT 5] CORS enabled');
+    const allowedOrigins = new Set(configuredOrigins);
 
-    // Swagger
+    app.enableCors({
+      origin: (origin, callback) => {
+        // Non-browser callers such as server-to-server tests have no Origin header.
+        if (!origin || allowedOrigins.has(origin)) {
+          callback(null, true);
+          return;
+        }
+
+        // Return the response without authorizing the browser origin.
+        callback(null, false);
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-WellNest-Telemetry-Key',
+      ],
+    });
+
     const config = new DocumentBuilder()
       .setTitle('WellNest API')
       .setDescription('The core backend engine for the WellNest ecosystem')
       .setVersion('1.0')
       .addBearerAuth()
+      .addApiKey(
+        { type: 'apiKey', in: 'header', name: 'X-WellNest-Telemetry-Key' },
+        'telemetry-key',
+      )
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api/docs', app, document);
 
-    console.log('[BOOT 6] Swagger configured at /api/docs');
-
-    // MQTT
     app.connectMicroservice<MicroserviceOptions>({
       transport: Transport.MQTT,
       options: {
@@ -81,46 +84,21 @@ async function bootstrap() {
       },
     });
 
-    console.log('[BOOT 7] MQTT microservice configured');
-
-    // Start HTTP server FIRST
     const port = Number(process.env.PORT) || 3000;
-
-    console.log(`[BOOT 8] Attempting HTTP listen on port ${port}...`);
-
     await app.listen(port, '0.0.0.0');
 
-    console.log(`[BOOT 9] HTTP server successfully listening on port ${port}`);
-    console.log(`[BOOT 9] Swagger available at /api/docs`);
-
-    // Start MQTT after HTTP is already available
     try {
-      console.log('[MQTT 1] Attempting HiveMQ connection...');
-
       await app.startAllMicroservices();
-
-      console.log('[MQTT 2] Connected successfully to HiveMQ');
+      console.log('[MQTT] Connected successfully to HiveMQ');
     } catch (err) {
-      console.error('[MQTT ERROR] Could not connect to HiveMQ');
-      console.error(err);
-
-      // Do NOT exit:
-      // REST API can still run if MQTT fails.
+      console.error('[MQTT] Could not connect to HiveMQ', err);
+      // REST API remains available even if MQTT is temporarily unavailable.
     }
 
-    console.log('[BOOT 10] WellNest bootstrap complete');
+    console.log(`[WellNest] HTTP server listening on ${port}`);
+    console.log('[WellNest] Swagger available at /api/docs');
   } catch (err) {
-    console.error('======================================');
-    console.error('[FATAL BOOT ERROR]');
-    console.error(err);
-
-    if (err instanceof Error) {
-      console.error('Message:', err.message);
-      console.error('Stack:', err.stack);
-    }
-
-    console.error('======================================');
-
+    console.error('[FATAL BOOT ERROR]', err);
     process.exit(1);
   }
 }

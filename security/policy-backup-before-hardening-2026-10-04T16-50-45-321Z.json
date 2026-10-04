@@ -1,0 +1,112 @@
+[
+  {
+    "schemaname": "public",
+    "tablename": "alerts",
+    "policyname": "Admins view all alerts",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "ALL",
+    "qual": "(get_my_role() = 'ADMIN'::user_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "alerts",
+    "policyname": "Caregivers view assigned senior alerts",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "((get_my_role() = 'CAREGIVER'::user_role) AND (senior_id IN ( SELECT caregiver_senior.senior_id\n   FROM caregiver_senior\n  WHERE (caregiver_senior.caregiver_id = auth.uid()))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "alerts",
+    "policyname": "Enable read access for all users (Dev Mode)",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "true",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "alerts",
+    "policyname": "Seniors view own alerts",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "(auth.uid() = senior_id)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "caregiver_senior",
+    "policyname": "Caregiver can link to senior",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(caregiver_id = auth.uid())"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "environmental_readings",
+    "policyname": "View telemetry based on device ownership",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "(device_id IN ( SELECT devices.id\n   FROM devices\n  WHERE ((devices.senior_id = auth.uid()) OR (devices.senior_id IN ( SELECT caregiver_senior.senior_id\n           FROM caregiver_senior\n          WHERE (caregiver_senior.caregiver_id = auth.uid()))) OR (get_my_role() = 'ADMIN'::user_role))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "users",
+    "policyname": "Admins can view all users",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "(get_my_role() = 'ADMIN'::user_role)",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "users",
+    "policyname": "Caregivers can create new senior profiles",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "((get_my_role() = 'CAREGIVER'::user_role) AND (role = 'SENIOR'::user_role))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "users",
+    "policyname": "Caregivers can view their seniors",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "((get_my_role() = 'CAREGIVER'::user_role) AND (id IN ( SELECT caregiver_senior.senior_id\n   FROM caregiver_senior\n  WHERE (caregiver_senior.caregiver_id = auth.uid()))))",
+    "with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "users",
+    "policyname": "Users can insert their own profile",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "(auth.uid() = id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "users",
+    "policyname": "Users can view themselves",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "cmd": "SELECT",
+    "qual": "(auth.uid() = id)",
+    "with_check": null
+  }
+]
